@@ -1,7 +1,9 @@
 import numpy as np
+import random
 
 from allensdk.core.cell_types_cache import CellTypesCache
 from allensdk.ephys.ephys_extractor import EphysSweepFeatureExtractor
+import h5py
 
 
 def load_sweep(ds, sweep_num):
@@ -44,35 +46,61 @@ def grab_patches(v, i, t, si, pi, ti, N, patch_size):
 
     noev = list(set(np.arange(len(v))) - set(si.tolist()) - set(pi.tolist()) - set(ti.tolist()))
 
+    cats = []
     patches = []
     for arr, cat in zip((si, pi, ti, noev), (0, 1, 2, 3)):
+        if len(arr) == 0:
+            continue
+
         idxs = np.random.choice(arr, N)
         for idx in idxs:
             r = idx-hp, idx+hp
-            patches.append((cat, v[r[0]:r[1]]))
+            if r[0] > 0 and r[1] <= len(v):
+                cats.append(cat)
+                patches.append(v[r[0]:r[1]])
     
-    return patches
+    return np.array(cats), np.vstack(patches)
+
+def sample_data_set(ds, N, N_sweep, patch_size):
+    sweep_nums = ds.get_sweep_numbers()
     
-patch_size = 2000
-cell_id = 507121819
-sweep_num = 35
+    ct = 0
+    for i in range(1000):
+        if ct >= N:
+            break
+
+        idx = random.randint(0,len(sweep_nums)-1)
+        sweep_num = sweep_nums[idx]
+        
+        v, i, t, si, pi, ti = load_sweep(ds, sweep_num)
+
+        cats, patches = grab_patches(v, i, t,
+                                     si, pi, ti,
+                                     N_sweep, patch_size)
+
+        if len(cats) > 0:
+            yield cats, patches
+
+        ct += cats.shape[0]
+        print(ct)
+
+def sample_data_sets(cells, ctc, num_cells, patches_per_cell, patches_per_grab, patch_size):
+    idxs = np.random.choice(np.arange(len(cells)), num_cells)
+    for idx in idxs:
+        cell = cells[idx]
+        ds = ctc.get_ephys_data(cell['id'])
+
+        for cats, patches in sample_data_set(ds, patches_per_cell, patches_per_grab, patch_size):
+            yield cats, patches
+
+from allensdk.config import enable_console_log
+enable_console_log()
 
 ctc = CellTypesCache()
 cells = ctc.get_cells()
 
-ds = ctc.get_ephys_data(cell_id)
-v, i, t, si, pi, ti = load_sweep(ds, sweep_num)
+for i, (cats, patches) in enumerate(sample_data_sets(cells, ctc, 100, 1000, 100, 2000)):
+    print(i)
+    np.save('patches/cats_%04d.npy' % i, cats)
+    np.save('patches/patches_%04d.npy' % i, patches)
 
-patches = grab_patches(v, i, t,
-                       si, pi, ti,
-                       10, patch_size)
-
-print(patches)
-
-import matplotlib
-matplotlib.use('agg')
-import matplotlib.pyplot as plt
-plt.plot(patches[0][1])
-plt.savefig('test.png')
-
-    
