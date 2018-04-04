@@ -8,9 +8,9 @@ from torch.autograd import Variable
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.N = 10
+        self.N = 30
         self.k = 25
-        self.p = 18800
+        self.p = self.N * 1880
         self.cats = 4
         self.conv1 = nn.Conv1d(in_channels=1, out_channels=self.N, kernel_size=self.k)
         self.conv2 = nn.Conv1d(in_channels=self.N, out_channels=self.N, kernel_size=self.k)
@@ -29,6 +29,7 @@ class Net(nn.Module):
         x = F.relu(self.conv3(x))
         x = F.relu(self.conv4(x))
         x = F.relu(self.conv5(x))
+        print(x.size())
         x = x.view(-1,self.p)
         x = self.fc(x)
         #x = F.log_softmax(x, dim=-1)
