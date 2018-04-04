@@ -17,7 +17,7 @@ if cuda:
     model.cuda()
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=0.01)
+optimizer = optim.Adam(model.parameters())#, lr=0.001)
 
 def train_loader():
     pat = re.compile('.*?_(\d+).npy')
@@ -48,13 +48,13 @@ def train(cuda, save_path):
 
         data, target = Variable(data), Variable(target)
             
-        optimizer.zero_grad()
         output = model(data)
         loss = criterion(output, target)
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        print('Loss: %.6f' % loss.data[0])
+        print('Loss:', loss.data)
         torch.save(model.state_dict(), save_path)
         del data, target, output
 
