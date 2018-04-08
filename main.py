@@ -17,16 +17,20 @@ model = Net()
 if cuda:
     model.cuda()
 
-criterion = nn.MSELoss()#nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters())#, lr=0.001)
+criterion = nn.BCEWithLogitsLoss()
+#criterion = nn.BCELoss()
+#criterion = nn.MSELoss()
 
-def train_loader(batch_size=100):
+optimizer = optim.Adam(model.parameters(), lr=0.1)
+#optimizer = optim.SGD(model.parameters(), lr=0.1)
+
+def train_loader(batch_size=20, epochs=10):
     with h5py.File("training_data.h5", "r") as f:
         cats = f["cats"].value
         patches = f["patches"].value
         
     n_samples = patches.shape[0]
-    batches = n_samples // batch_size
+    batches = n_samples // batch_size * epochs
     print("attempting %d batches, %d samples per batch" % (batches, batch_size))
 
     for i in range(batches):
@@ -38,37 +42,43 @@ def train_loader(batch_size=100):
 
         s = bpatches.shape
         bpatches = bpatches.reshape(s[0], 1, s[1])
-        bcats = bcats.reshape(s[0], 1, s[1])
 
         yield bcats, bpatches
 
     
 def train(cuda, save_path):
     for cats, patches in train_loader():
+        border = (cats.shape[2] - model.S) // 2
+
+        # just threshold for now
+        cats = cats[:,0,border:-border]
+        #print(cats.shape)
+        
         data = torch.Tensor(patches)
+        target = torch.Tensor(cats)
         
         if cuda:
             data.cuda()
+            target.cuda()
 
-        data = Variable(data)            
-        output = model(data)
-        
-        border = (cats.shape[2] - output.size()[2]) // 2
-        cats = cats[:,:,border:border+output.size()[2]]
-        target = torch.Tensor(cats)
+        data, target = Variable(data), Variable(target)
 
         if cuda:
             target.cuda()
             
-        target = Variable(target)
-        
-        loss = criterion(output, target)
         optimizer.zero_grad()
+        
+        output = model(data)
+        #print(output.size(), target.size())
+        #print(output, target)
+        loss = criterion(output, target)
         loss.backward()
         optimizer.step()
 
+        #print(model.conv1.weight.data.numpy()[0])
+
         print('Loss: %0.7f' % loss.data)
         torch.save(model.state_dict(), save_path)
-        del data, target, output
+        #del data, target, output
 
 train(cuda=cuda, save_path='model_weights.torch')

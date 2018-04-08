@@ -53,10 +53,10 @@ def resample_timeseries(v, i, t,
     return v, i, t, si, pi, ti
 
 def grab_patches(v, i, t, si, pi, ti, N, patch_size):
-    c = np.zeros(v.shape, dtype=np.uint8)
-    c[si] = 1
-    c[pi] = 2
-    c[ti] = 3
+    c = np.zeros((3, v.shape[0]), dtype=np.uint8)
+    c[0,si] = 1
+    c[1,pi] = 1
+    c[2,ti] = 1
     
     hp = patch_size // 2
 
@@ -73,12 +73,12 @@ def grab_patches(v, i, t, si, pi, ti, N, patch_size):
             r = idx-hp, idx+hp
             if r[0] > 0 and r[1] <= len(v):
                 pv = v[r[0]:r[1]]
-                cv = c[r[0]:r[1]]
+                cv = c[:,r[0]:r[1]]
 
                 patches.append(pv)
                 cats.append(cv)
     
-    return np.vstack(cats), np.vstack(patches)
+    return np.stack(cats, axis=0), np.vstack(patches)
 
 def sample_data_set(ds, N, N_sweep, patch_size):
     sweep_nums = ds.get_sweep_numbers()
@@ -100,7 +100,7 @@ def sample_data_set(ds, N, N_sweep, patch_size):
         if cats.shape[0] > 0:
             yield cats, patches
 
-        ct += cats.shape[0]
+        ct += patches.shape[0]
         print(ct)
 
 def sample_data_sets(cells, ctc, num_cells, patches_per_cell, patches_per_grab, patch_size):
@@ -116,7 +116,7 @@ def download():
     ctc = CellTypesCache(manifest_file='ctc/manifest.json')
     cells = ctc.get_cells()
 
-    for i, (cats, patches) in enumerate(sample_data_sets(cells, ctc, 200, 1000, 100, 2000)):
+    for i, (cats, patches) in enumerate(sample_data_sets(cells, ctc, 10, 1000, 100, 2000)):
         np.save('patches/cats_%04d.npy' % i, cats)
         np.save('patches/patches_%04d.npy' % i, patches)
 
@@ -139,9 +139,13 @@ def combine():
     patches = np.concatenate(patches)
     cats = np.concatenate(cats)
 
+    mean = patches.mean()
+    std = patches.std()
+    patches = (patches - mean) / std
+
     print(patches.shape)
     print(cats.shape)
-    
+
     with h5py.File('training_data.h5', 'w') as f:
         f.create_dataset('patches', data=patches)
         f.create_dataset('cats', data=cats)
