@@ -6,10 +6,10 @@ from torchvision import datasets, transforms
 from torch.autograd import Variable
 
 class Net(nn.Module):
-    N = 20
+    N = 100
     K = 25
     CATS = 3
-    S = 1952
+    S = 152
     
     def __init__(self):
         super(Net, self).__init__()
@@ -35,6 +35,8 @@ class Net(nn.Module):
         x = F.relu(self.conv2(x))
         x = x.view(-1, self.S*self.N)
         x = self.fc(x)
+        #x = F.log_softmax(self.fc(x), dim=-1)
+        
 
         #x = F.sigmoid(x)
         #print(x.size())

@@ -1,3 +1,8 @@
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt
+
+import os
 import argparse
 import torch
 import torch.nn as nn
@@ -11,6 +16,7 @@ import re
 import numpy as np
 import h5py
 
+
 cuda = False
 
 model = Net()
@@ -19,12 +25,14 @@ if cuda:
 
 criterion = nn.BCEWithLogitsLoss()
 #criterion = nn.BCELoss()
+#criterion = nn.CrossEntropyLoss()
 #criterion = nn.MSELoss()
+#criterion = nn.NLLLoss()
 
 optimizer = optim.Adam(model.parameters(), lr=0.1)
 #optimizer = optim.SGD(model.parameters(), lr=0.1)
 
-def train_loader(batch_size=20, epochs=10):
+def train_loader(batch_size=1, epochs=30):
     with h5py.File("training_data.h5", "r") as f:
         cats = f["cats"].value
         patches = f["patches"].value
@@ -34,7 +42,6 @@ def train_loader(batch_size=20, epochs=10):
     print("attempting %d batches, %d samples per batch" % (batches, batch_size))
 
     for i in range(batches):
-        print(i)
         idxs = np.random.choice(np.arange(n_samples), batch_size)
         
         bcats = cats[idxs]
@@ -46,8 +53,8 @@ def train_loader(batch_size=20, epochs=10):
         yield bcats, bpatches
 
     
-def train(cuda, save_path):
-    for cats, patches in train_loader():
+def train(cuda, save_dir):
+    for i, (cats, patches) in enumerate(train_loader()):
         border = (cats.shape[2] - model.S) // 2
 
         # just threshold for now
@@ -75,10 +82,28 @@ def train(cuda, save_path):
         loss.backward()
         optimizer.step()
 
-        #print(model.conv1.weight.data.numpy()[0])
+        
+        if (i % 100) == 0:
+            print('Batch %d, Loss: %0.7f' % (i+1, loss.data))
+            #print(model.conv1.weight.data.numpy()[0])
+            d =   model.conv1.weight.data.numpy()
 
-        print('Loss: %0.7f' % loss.data)
-        torch.save(model.state_dict(), save_path)
-        #del data, target, output
+            fig, (ax1,ax2) = plt.subplots(2,1)
+            for row in range(d.shape[0]):
+                ax1.plot(d[row,0])
 
-train(cuda=cuda, save_path='model_weights.torch')
+            ax2.plot(data.data.numpy()[0,0,border:-border], label='v')
+            ax2.plot(target.data.numpy()[0], label='target')
+            ax2.plot(F.softmax(output).data.numpy()[0], label='output')
+            ax2.legend()
+            
+            plt.suptitle('Loss: %0.7f' % loss.data)
+            plt.savefig(os.path.join(save_dir, "%03d.png" % i))
+            plt.close()
+
+
+
+            torch.save(model.state_dict(), os.path.join(save_dir, 'model_weights.torch'))
+        del data, target, output
+
+train(cuda=cuda, save_dir='/mnt/c/Users/davidf/workspace/nnspike')

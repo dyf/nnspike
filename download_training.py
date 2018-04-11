@@ -14,9 +14,6 @@ from allensdk.ephys.ephys_extractor import EphysSweepFeatureExtractor
 
 
 
-
-
-
 def load_sweep(ds, sweep_num):
     sweep = ds.get_sweep(sweep_num)
     v = sweep['response'] * 1e3 # to mV
@@ -60,16 +57,15 @@ def grab_patches(v, i, t, si, pi, ti, N, patch_size):
     
     hp = patch_size // 2
 
-    noev = list(set(np.arange(len(v))) - set(si.tolist()) - set(pi.tolist()) - set(ti.tolist()))
-
     cats = []
     patches = []
-    for arr, cat in zip((si, pi, ti, noev), (0, 1, 2, 3)):
+    for arr, cat in zip((si, pi, ti), (0, 1, 2)):
         if len(arr) == 0:
             continue
         
         idxs = np.random.choice(arr, N)
         for idx in idxs:
+            idx = idx + random.randint(-hp,hp)
             r = idx-hp, idx+hp
             if r[0] > 0 and r[1] <= len(v):
                 pv = v[r[0]:r[1]]
@@ -77,6 +73,8 @@ def grab_patches(v, i, t, si, pi, ti, N, patch_size):
 
                 patches.append(pv)
                 cats.append(cv)
+    if len(patches) == 0:
+        return [], []
     
     return np.stack(cats, axis=0), np.vstack(patches)
 
@@ -93,14 +91,16 @@ def sample_data_set(ds, N, N_sweep, patch_size):
         
         v, i, t, si, pi, ti = load_sweep(ds, sweep_num)
 
+
         cats, patches = grab_patches(v, i, t,
                                      si, pi, ti,
                                      N_sweep, patch_size)
 
-        if cats.shape[0] > 0:
+        n_patches = len(cats)
+        if n_patches > 0:
             yield cats, patches
 
-        ct += patches.shape[0]
+        ct += n_patches
         print(ct)
 
 def sample_data_sets(cells, ctc, num_cells, patches_per_cell, patches_per_grab, patch_size):
@@ -109,14 +109,14 @@ def sample_data_sets(cells, ctc, num_cells, patches_per_cell, patches_per_grab, 
         cell = cells[idx]
         ds = ctc.get_ephys_data(cell['id'])
 
-        for cats, patches in sample_data_set(ds, patches_per_cell, patches_per_grab, patch_size):
-            yield cats, patches
+        yield from sample_data_set(ds, patches_per_cell, patches_per_grab, patch_size)
 
 def download():
     ctc = CellTypesCache(manifest_file='ctc/manifest.json')
     cells = ctc.get_cells()
 
-    for i, (cats, patches) in enumerate(sample_data_sets(cells, ctc, 10, 1000, 100, 2000)):
+    for i, (cats, patches) in enumerate(sample_data_sets(cells, ctc, 20, 1000, 100, 200)):
+        print(cats.shape)
         np.save('patches/cats_%04d.npy' % i, cats)
         np.save('patches/patches_%04d.npy' % i, patches)
 
@@ -132,10 +132,11 @@ def combine():
             pid = int(m.group(1))
             pfile = 'patches/patches_%04d.npy' % pid
             cfile = 'patches/cats_%04d.npy' % pid
-
+            
             patches.append(np.load(pfile))
             cats.append(np.load(cfile))
-    
+
+            
     patches = np.concatenate(patches)
     cats = np.concatenate(cats)
 
@@ -150,5 +151,5 @@ def combine():
         f.create_dataset('patches', data=patches)
         f.create_dataset('cats', data=cats)
 
-#download()
+download()
 combine()
