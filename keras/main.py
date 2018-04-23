@@ -2,7 +2,6 @@ import keras.models as km
 import keras.layers as kl
 import keras.callbacks as kc
 import numpy as np
-import train 
 import h5py
 import matplotlib.pyplot as plt
 
@@ -61,22 +60,24 @@ def vis_model():
     print("c", cats.shape)
     print("o", output.shape)
 
-    buffer = 30
-    pi, channel = 10000, 0
+    buffer = (patch_size - out_size) // 2
 
-    plt.plot(patches[pi,buffer:-buffer], label='v')
+    for i in range(10):
+        pi = np.random.randint(0,patches.shape[0])
 
-    for channel, label in zip((0,1,2), ("threshold", "peak", "trough")):
-        c = cats[pi,channel,buffer:-buffer]
-        o = output[pi,:,channel]
+        plt.plot(patches[pi,buffer:-buffer], label='v')
+        
+        for channel, label in zip((0,1,2), ("threshold", "peak", "trough")):
+            c = cats[pi,channel,buffer:-buffer]
+            o = output[pi,:,channel]
 
-        plt.plot(c, label='train_'+label)
-        plt.plot(o+0.1, label='output_'+label)
+            plt.plot(c, label='train_'+label)
+            plt.plot(o+0.1, label='output_'+label)
 
-    plt.legend()
-    plt.show()
+        plt.legend()
+        plt.show()
     
 
-train_model()
-#vis_model()
+#train_model()
+vis_model()
 
