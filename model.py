@@ -35,6 +35,7 @@ class Net(nn.Module):
         x = F.relu(self.conv2(x))
         x = x.view(-1, self.S*self.N)
         x = self.fc(x)
+        x = F.sigmoid(x)
         #x = F.log_softmax(self.fc(x), dim=-1)
         
 

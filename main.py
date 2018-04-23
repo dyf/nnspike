@@ -23,10 +23,10 @@ model = Net()
 if cuda:
     model.cuda()
 
-criterion = nn.BCEWithLogitsLoss()
+#criterion = nn.BCEWithLogitsLoss()
 #criterion = nn.BCELoss()
 #criterion = nn.CrossEntropyLoss()
-#criterion = nn.MSELoss()
+criterion = nn.MSELoss()
 #criterion = nn.NLLLoss()
 
 optimizer = optim.Adam(model.parameters(), lr=0.1)
@@ -94,7 +94,8 @@ def train(cuda, save_dir):
 
             ax2.plot(data.data.numpy()[0,0,border:-border], label='v')
             ax2.plot(target.data.numpy()[0], label='target')
-            ax2.plot(F.softmax(output).data.numpy()[0], label='output')
+            #ax2.plot(F.softmax(output).data.numpy()[0], label='output')
+            ax2.plot(output.data.numpy()[0], label='output')
             ax2.legend()
             
             plt.suptitle('Loss: %0.7f' % loss.data)
@@ -106,4 +107,4 @@ def train(cuda, save_dir):
             torch.save(model.state_dict(), os.path.join(save_dir, 'model_weights.torch'))
         del data, target, output
 
-train(cuda=cuda, save_dir='/mnt/c/Users/davidf/workspace/nnspike')
+train(cuda=cuda, save_dir='./output/')
