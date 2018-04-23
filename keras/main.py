@@ -4,9 +4,17 @@ import keras.callbacks as kc
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
+import sys
+import argparse
 
 patch_size = 200
 out_size = 160
+
+model = km.Sequential([
+        kl.Conv1D(filters=10, kernel_size=21, activation='relu', input_shape=(None,1)),
+        kl.Conv1D(filters=40, kernel_size=21, activation='relu'),
+        kl.Dense(4, activation='softmax'),
+        ])
 
 def loader():
     with h5py.File("training_data.h5", "r") as f:
@@ -29,28 +37,22 @@ def loader():
     yield ocats, patches[:,:,np.newaxis]
 
 
-model = km.Sequential([
-        kl.Conv1D(filters=10, kernel_size=21, activation='relu', input_shape=(None,1)),
-        kl.Conv1D(filters=40, kernel_size=21, activation='relu'),
-        kl.Dense(4, activation='softmax'),
-        ])
+def train_model(batch_size, epochs, output_file):
+    model.compile(optimizer='adam',
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
 
-model.compile(optimizer='adam',
-              loss='categorical_crossentropy',
-              metrics=['accuracy'])
-
-
-def train_model():
     for cats, patches in loader():
         model.fit(patches, cats, 
-                  batch_size=100, epochs=500, 
-                  callbacks=[kc.ModelCheckpoint('output/model.h5')])
+                  batch_size=batch_size, epochs=epochs, 
+                  callbacks=[kc.ModelCheckpoint(output_file)])
 
 
-def vis_model():
-    model = km.load_model('output/model.h5')
+def vis_model(model_file, training_file, N):
+    print(model_file, training_file, N)
+    model = km.load_model(model_file)
 
-    with h5py.File('training_data.h5','r') as f:
+    with h5py.File(training_file, 'r') as f:
         patches = f['patches'].value
         cats = f['cats'].value
 
@@ -62,7 +64,7 @@ def vis_model():
 
     buffer = (patch_size - out_size) // 2
 
-    for i in range(10):
+    for i in range(N):
         pi = np.random.randint(0,patches.shape[0])
 
         plt.plot(patches[pi,buffer:-buffer], label='v')
@@ -76,8 +78,34 @@ def vis_model():
 
         plt.legend()
         plt.show()
+        plt.close()
     
 
-#train_model()
-vis_model()
+def main():
+    command = sys.argv[1]
+
+    parser = argparse.ArgumentParser()
+
+    if command == "train":
+        parser.add_argument("--batch_size", type=int, default=100)
+        parser.add_argument("--epochs", type=int, default=500)
+        parser.add_argument("--output_file", default="output/model.h5")
+        args = parser.parse_args(sys.argv[2:])
+
+        train_model(**vars(args))
+    elif command == "vis":
+        parser.add_argument("--N", type=int, default=10)
+        parser.add_argument("--model_file", default="output/model.h5") 
+        parser.add_argument("--training_file", default="training_data.h5")
+        args = parser.parse_args(sys.argv[2:])
+        
+        vis_model(**vars(args))
+
+        
+        
+
+    
+
+if __name__ == "__main__": main()
+    
 
