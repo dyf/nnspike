@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import sys
 import argparse
 
-patch_size = 200
-out_size = 160
+patch_size = 1000
+out_size = 960
 
 model = km.Sequential([
         kl.Conv1D(filters=10, kernel_size=21, activation='relu', input_shape=(None,1)),
