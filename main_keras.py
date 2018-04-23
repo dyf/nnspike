@@ -7,7 +7,7 @@ import h5py
 import matplotlib.pyplot as plt
 
 patch_size = 200
-out_size = 170
+out_size = 160
 
 def loader():
     with h5py.File("training_data.h5", "r") as f:
@@ -31,10 +31,9 @@ def loader():
 
 
 model = km.Sequential([
-        kl.Conv1D(filters=10, kernel_size=11, activation='relu', input_shape=(None,1)),
-        kl.Conv1D(filters=20, kernel_size=11, activation='relu', input_shape=(None,1)),
-        kl.Conv1D(filters=4, kernel_size=11, activation='softmax'),
-        #kl.Dense((200,1), input_shape=(None,1))
+        kl.Conv1D(filters=10, kernel_size=21, activation='relu', input_shape=(None,1)),
+        kl.Conv1D(filters=40, kernel_size=21, activation='relu'),
+        kl.Dense(4, activation='softmax'),
         ])
 
 model.compile(optimizer='adam',
@@ -45,11 +44,39 @@ model.compile(optimizer='adam',
 def train_model():
     for cats, patches in loader():
         model.fit(patches, cats, 
-                  batch_size=100, epochs=1000, 
+                  batch_size=100, epochs=500, 
                   callbacks=[kc.ModelCheckpoint('output/model.h5')])
 
-    model.save('output/model_thresh.h5')
 
+def vis_model():
+    model = km.load_model('output/model.h5')
+
+    with h5py.File('training_data.h5','r') as f:
+        patches = f['patches'].value
+        cats = f['cats'].value
+
+    output = model.predict(patches[:,:,np.newaxis])
+
+    print("p", patches.shape)
+    print("c", cats.shape)
+    print("o", output.shape)
+
+    buffer = 30
+    pi, channel = 10000, 0
+
+    plt.plot(patches[pi,buffer:-buffer], label='v')
+
+    for channel, label in zip((0,1,2), ("threshold", "peak", "trough")):
+        c = cats[pi,channel,buffer:-buffer]
+        o = output[pi,:,channel]
+
+        plt.plot(c, label='train_'+label)
+        plt.plot(o+0.1, label='output_'+label)
+
+    plt.legend()
+    plt.show()
+    
 
 train_model()
+#vis_model()
 
