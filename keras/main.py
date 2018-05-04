@@ -77,8 +77,13 @@ def vis_model(model_file, training_file, N):
 
     for pi in range(N):
         plt.plot(patches[pi,pad:-pad,0], label='v')
-        plt.plot(cats[pi,:,1:].sum(axis=1), label="train")
-        plt.plot(-output[pi,:,1:].sum(axis=1), label="predict")
+        
+        train_idxs = np.where(cats[pi,:,1:] > 0)
+        predict_idxs = np.where(output[pi,:,1:] > .5)
+        
+        plt.scatter(train_idxs[0], np.ones(len(train_idxs[0]))*0, label='train')
+        plt.scatter(predict_idxs[0], np.ones(len(predict_idxs[0]))*(-0.1), label='predict')
+
         plt.legend()
         plt.show()
         plt.close()
