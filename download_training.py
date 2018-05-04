@@ -50,33 +50,35 @@ def resample_timeseries(v, i, t,
     return v, i, t, si, pi, ti
 
 def grab_patches(v, i, t, si, pi, ti, N, patch_size):
-    c = np.zeros((3, v.shape[0]), dtype=np.uint8)
-    c[0,si] = 1
-    c[1,pi] = 1
-    c[2,ti] = 1
+    if len(pi) == 0:
+        return [], []
+
+    c = np.zeros((v.shape[0],), dtype=np.uint8)
+    c[si] = 1
+    c[pi] = 2
+    c[ti] = 3
     
     hp = patch_size // 2
 
     cats = []
     patches = []
-    for arr, cat in zip((si, pi, ti), (0, 1, 2)):
-        if len(arr) == 0:
-            continue
-        
-        idxs = np.random.choice(arr, N)
-        for idx in idxs:
-            idx = idx + random.randint(-hp,hp)
-            r = idx-hp, idx+hp
-            if r[0] > 0 and r[1] <= len(v):
-                pv = v[r[0]:r[1]]
-                cv = c[:,r[0]:r[1]]
 
-                patches.append(pv)
-                cats.append(cv)
+    idxs = np.random.choice(pi, N)
+
+    for idx in idxs:
+        idx = idx + random.randint(-hp,hp)
+        r = idx-hp, idx+hp
+        if r[0] > 0 and r[1] <= len(v):
+            pv = v[r[0]:r[1]]
+            cv = c[r[0]:r[1]]
+
+            patches.append(pv)
+            cats.append(cv)
+
     if len(patches) == 0:
         return [], []
     
-    return np.stack(cats, axis=0), np.vstack(patches)
+    return np.vstack(cats), np.vstack(patches)
 
 def sample_data_set(ds, N, N_sweep, patch_size):
     sweep_nums = ds.get_sweep_numbers()
@@ -115,7 +117,7 @@ def download():
     ctc = CellTypesCache(manifest_file='ctc/manifest.json')
     cells = ctc.get_cells()
 
-    for i, (cats, patches) in enumerate(sample_data_sets(cells, ctc, 100, 1000, 100, 1000)):
+    for i, (cats, patches) in enumerate(sample_data_sets(cells, ctc, 100, 1000, 100, 500)):
         print(cats.shape)
         np.save('patches/cats_%04d.npy' % i, cats)
         np.save('patches/patches_%04d.npy' % i, patches)
