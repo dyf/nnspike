@@ -9,6 +9,7 @@ import keras.callbacks as kc
 
 from allensdk.core.cell_types_cache import CellTypesCache
 
+
 def resample_timeseries(v, i, t, 
                         hz_in, hz_out):
     factor = int(hz_in / hz_out)
@@ -19,58 +20,100 @@ def resample_timeseries(v, i, t,
     
     return v, i, t
 
-def load_data():
+def load_sweep(ds, sn):
+    sweep = ds.get_sweep(sn)
+    
+    idx0 = sweep['index_range'][0]
+    v = sweep['response'] * 1e3 # to mV
+    i = sweep['stimulus'] * 1e12 # to pA
+    t = np.arange(0, len(v)) * (1.0 / sweep['sampling_rate'])
+
+    v = v[idx0:]    
+    i = i[idx0:]
+    t = t[idx0:]
+
+    hz_in = sweep['sampling_rate']
+    hz_out = 25000.
+
+    return resample_timeseries(v, i, t, hz_in, hz_out)
+
+def load_data(stim_names):
     ctc = CellTypesCache(manifest_file="ctc/manifest.json")
     cells = ctc.get_cells()
     
     cell_id = cells[0]['id']
     sweeps = ctc.get_ephys_sweeps(cell_id)
-    noise_sweeps = [ sweep['sweep_number'] for sweep in sweeps if sweep['stimulus_name'] == 'Noise 1' ]
+    sweeps = [ (sweep['sweep_number'],sweep['stimulus_name']) for sweep in sweeps if sweep['stimulus_name'] in stim_names ]
 
     ds = ctc.get_ephys_data(cell_id)
 
     vv, ii = [], []
 
-    for sn in noise_sweeps:
-        sweep = ds.get_sweep(sn)
-        v = sweep['response'] * 1e3 # to mV
-        i = sweep['stimulus'] * 1e12 # to pA
-        t = np.arange(0, len(v)) * (1.0 / sweep['sampling_rate'])
-        hz_in = sweep['sampling_rate']
-        hz_out = 25000.
+    dur = 1000
+    delay = 100
 
-        v,i,t = resample_timeseries(v, i, t, hz_in, hz_out)
+    for sn,st in sweeps:
+        v,i,t = load_sweep(ds, sn)
 
-        vv.append(v)
-        ii.append(i)
+        idx0 = np.argwhere(i!=0)[0][0] - delay
+        
+        v = v[idx0:]
+        i = i[idx0:]
 
-    return np.array(ii), np.array(vv)
+        if st.startswith('Noise'):
+            offs = [ 0, 200000, 400000 ] 
+            for off in offs: 
+                vv.append(v[off:])
+                ii.append(i[off:])
+        else:
+            vv.append(v)
+            ii.append(i)
 
-stims, resps = load_data()
+    stims = np.array([i[:dur] for i in ii])
+    resps = np.array([v[:dur] for v in vv]) + 74.0
 
-ts = [ [80000, 100000], [280000, 300000], [480000, 500000] ]
-stims = np.vstack([ stims[:,t[0]:t[1]] for t in ts ])
-resps = np.vstack([ resps[:,t[0]:t[1]] for t in ts ])
+    print(stims.shape)
 
-print(stims.shape)
+    return stims, resps
 
-time_steps = stims.shape[1]
-repeats = stims.shape[0]
+def train():
+    stims, resps = load_data(['Noise 1','Long Square','Short Square'])
 
-model = km.Sequential([
-    kl.LSTM(10, return_sequences=True, input_shape=(time_steps,1)),
-    kl.LSTM(10, return_sequences=True),
-    kl.Dense(1)
-    ])
+    time_steps = stims.shape[1]
+    repeats = stims.shape[0]
 
-model.compile(loss='mse',
-              optimizer='adam',
-              metrics=['accuracy'])
+    model = km.Sequential([
+        kl.GRU(10, return_sequences=True, input_shape=(time_steps,1)),
+        kl.GRU(10, return_sequences=True),
+        kl.Dense(1)
+        ])
 
-stims = stims.reshape(stims.shape[0], stims.shape[1], 1)
-resps = resps.reshape(resps.shape[0], resps.shape[1], 1)
+    model.compile(loss='mse',
+                optimizer='adam',
+                metrics=['accuracy'])
 
-model.fit(stims, resps, epochs=10, batch_size=1,
-          callbacks=[ kc.ModelCheckpoint('output/model_lstm.h5') ])
+    stims = stims.reshape(stims.shape[0], stims.shape[1], 1)
+    resps = resps.reshape(resps.shape[0], resps.shape[1], 1)
 
+    model.fit(stims, resps, epochs=1000, batch_size=10,
+            callbacks=[ kc.ModelCheckpoint('output/model_lstm.h5') ])
 
+def vis():
+    stims, resps = load_data('Noise 2')
+
+    model = km.load_model('output/model_lstm.h5')
+    
+    output = model.predict(stims.reshape(stims.shape[0], stims.shape[1], 1))
+    output.reshape(output.shape[0], output.shape[1])
+
+    import matplotlib.pyplot as plt
+    for i in range(output.shape[0]):
+        plt.plot(stims[i], label='stim')
+        plt.plot(output[i], label='predict')
+        plt.plot(resps[i], label='train')
+        plt.legend()
+        plt.show()
+        plt.close()
+    
+train()
+#vis()
