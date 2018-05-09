@@ -8,6 +8,7 @@ import keras.models as km
 import keras.callbacks as kc
 
 from allensdk.core.cell_types_cache import CellTypesCache
+import matplotlib.pyplot as plt
 
 
 def resample_timeseries(v, i, t, 
@@ -49,11 +50,11 @@ def load_data(stim_names):
 
     vv, ii = [], []
 
-    dur = 1000
-    delay = 100
+    dur = 2000
+    delay = 200
 
     for sn,st in sweeps:
-        v,i,t = load_sweep(ds, sn)
+        v,i,t = load_sweep(ds, sn)        
 
         idx0 = np.argwhere(i!=0)[0][0] - delay
         
@@ -83,8 +84,8 @@ def train():
     repeats = stims.shape[0]
 
     model = km.Sequential([
-        kl.GRU(10, return_sequences=True, input_shape=(time_steps,1)),
-        kl.GRU(10, return_sequences=True),
+        kl.GRU(20, return_sequences=True, input_shape=(time_steps,1)),
+        kl.GRU(20, return_sequences=True),
         kl.Dense(1)
         ])
 
@@ -99,7 +100,7 @@ def train():
             callbacks=[ kc.ModelCheckpoint('output/model_lstm.h5') ])
 
 def vis():
-    stims, resps = load_data('Noise 2')
+    stims, resps = load_data(['Long Square'])
 
     model = km.load_model('output/model_lstm.h5')
     
