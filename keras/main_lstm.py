@@ -10,6 +10,7 @@ import keras.callbacks as kc
 from allensdk.core.cell_types_cache import CellTypesCache
 import matplotlib.pyplot as plt
 
+np.random.seed(0)
 
 def resample_timeseries(v, i, t, 
                         hz_in, hz_out):
@@ -38,7 +39,7 @@ def load_sweep(ds, sn):
 
     return resample_timeseries(v, i, t, hz_in, hz_out)
 
-def load_data(stim_names):
+def load_data(stim_names, reps=10, dur=3000, delay=200):
     ctc = CellTypesCache(manifest_file="ctc/manifest.json")
     cells = ctc.get_cells()
     
@@ -50,28 +51,28 @@ def load_data(stim_names):
 
     vv, ii = [], []
 
-    dur = 2000
-    delay = 200
-
     for sn,st in sweeps:
         v,i,t = load_sweep(ds, sn)        
 
-        idx0 = np.argwhere(i!=0)[0][0] - delay
-        
-        v = v[idx0:]
-        i = i[idx0:]
+        stim_start = np.argwhere(i!=0)[0][0]
 
-        if st.startswith('Noise'):
-            offs = [ 0, 200000, 400000 ] 
-            for off in offs: 
-                vv.append(v[off:])
-                ii.append(i[off:])
-        else:
-            vv.append(v)
-            ii.append(i)
+        for rep in range(reps):
+            idx0 = stim_start - delay - np.random.randint(0, dur//2)
+                        
+            vr = v[idx0:]
+            ir = i[idx0:]
 
-    stims = np.array([i[:dur] for i in ii])
-    resps = np.array([v[:dur] for v in vv]) + 74.0
+            if st.startswith('Noise'):
+                offs = [ 0, 200000, 400000 ] 
+                for off in offs: 
+                    vv.append(vr[off:off+dur])
+                    ii.append(ir[off:off+dur])
+            else:
+                vv.append(vr[:dur])
+                ii.append(ir[:dur])
+
+    stims = np.vstack(ii)
+    resps = np.vstack(vv) + 74.0
 
     print(stims.shape)
 
@@ -100,7 +101,7 @@ def train():
             callbacks=[ kc.ModelCheckpoint('output/model_lstm.h5') ])
 
 def vis():
-    stims, resps = load_data(['Long Square'])
+    stims, resps = load_data(['Noise 2'])
 
     model = km.load_model('output/model_lstm.h5')
     
