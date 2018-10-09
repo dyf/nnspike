@@ -9,11 +9,10 @@ import matplotlib.pyplot as plt
 import sys
 import argparse
 
-out_size = 440
-
+PAD = 50
 model = km.Sequential([
-        kl.Conv1D(filters=10, kernel_size=31, activation='relu', input_shape=(None,1)),
-        kl.Conv1D(filters=10, kernel_size=31, activation='relu'),
+        kl.Conv1D(filters=10, kernel_size=51, activation='relu', input_shape=(None,1)),
+        kl.Conv1D(filters=10, kernel_size=51, activation='relu'),
     # kl.Conv1D(filters=10, kernel_size=21, activation='relu'),
         kl.Dense(4, activation='softmax'),
         ])
@@ -23,24 +22,9 @@ def loader(training_file):
         cats = f["cats"].value
         patches = f["patches"].value
 
-    # peaks only
-    #cats = cats == 2
-    #for i in np.random.randint(0, patches.shape[0], 5):
-    #    plt.plot(patches[i])
-    #    plt.plot(cats[i])
-    #    plt.show()
-    #    plt.close()
-
     cats = ku.to_categorical(cats)
-        
-    n_samples = patches.shape[0]
 
-    s = patches.shape
-    
-    border = (cats.shape[1] - out_size) // 2
-
-  
-    return cats[:,border:-border], patches[:,:,np.newaxis]
+    return cats, patches[:,:,np.newaxis]
 
 
 def train_model(training_file, batch_size, epochs, output_file):
@@ -49,11 +33,14 @@ def train_model(training_file, batch_size, epochs, output_file):
                   metrics=['accuracy'])
 
     cats, patches = loader(training_file)
+
+    cats = cats[:,PAD:-PAD,:]
+
     print(cats.shape, patches.shape)
     model.fit(patches, cats, 
               batch_size=batch_size, epochs=epochs, 
               validation_split=.3,
-              callbacks=[kc.ModelCheckpoint(output_file)])
+              callbacks=[kc.ModelCheckpoint(output_file), kc.EarlyStopping()])
 
 
 def vis_model(model_file, training_file, N):
@@ -61,8 +48,6 @@ def vis_model(model_file, training_file, N):
     model = km.load_model(model_file)
 
     cats, patches = loader(training_file)
-    pad = (patches.shape[1] - out_size) // 2
-    
     idxs = np.random.randint(0, patches.shape[0], N)
 
     patches = patches[idxs,:,:]
@@ -76,9 +61,9 @@ def vis_model(model_file, training_file, N):
     print("o", output.shape)
 
     for pi in range(N):
-        plt.plot(patches[pi,pad:-pad,0], label='v')
+        plt.plot(patches[pi,PAD:-PAD,0], label='v')
         
-        train_idxs = np.where(cats[pi,:,1:] > 0)
+        train_idxs = np.where(cats[pi,PAD:-PAD,1:] > 0)
         predict_idxs = np.where(output[pi,:,1:] > .5)
         
         plt.scatter(train_idxs[0], np.ones(len(train_idxs[0]))*0, label='train')
@@ -98,13 +83,13 @@ def main():
         parser.add_argument("--training_file", default="training_data.h5")
         parser.add_argument("--batch_size", type=int, default=100)
         parser.add_argument("--epochs", type=int, default=1500)
-        parser.add_argument("--output_file", default="output/model.h5")
+        parser.add_argument("--output_file", default="cnn.weights")
         args = parser.parse_args(sys.argv[2:])
 
         train_model(**vars(args))
     elif command == "vis":
         parser.add_argument("--N", type=int, default=10)
-        parser.add_argument("--model_file", default="output/model.h5") 
+        parser.add_argument("--model_file", default="cnn.weights") 
         parser.add_argument("--training_file", default="training_data.h5")
         args = parser.parse_args(sys.argv[2:])
         

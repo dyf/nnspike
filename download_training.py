@@ -117,7 +117,7 @@ def download():
     ctc = CellTypesCache(manifest_file='ctc/manifest.json')
     cells = ctc.get_cells()
 
-    for i, (cats, patches) in enumerate(sample_data_sets(cells, ctc, 100, 1000, 100, 500)):
+    for i, (cats, patches) in enumerate(sample_data_sets(cells, ctc, 100, 1000, 100, 4096)):
         print(cats.shape)
         np.save('patches/cats_%04d.npy' % i, cats)
         np.save('patches/patches_%04d.npy' % i, patches)
